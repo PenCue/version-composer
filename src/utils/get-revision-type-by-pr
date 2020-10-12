@@ -1,0 +1,54 @@
+#! /bin/bash
+
+#get-revision-type-by-pr
+#by Mike wessling (mwessling@gmail.com)
+#Determine the revision type from the Github ENV VARS;  
+#if the branch name type precedence over provided detault it is used otherwise PROPOSED
+#If no revision type could be determined, then fallback on the PROPOSED.
+#Revision Types: in order 
+#		major
+#		minor
+#		build
+#		patch
+
+PROPOSED="$1";
+
+if [ "$#" -ne 1 ]; then
+	log "Missing proposed revision type";
+	exit 1
+fi
+
+if [[ ! "$PROPOSED" =~ ^(major|minor|build|patch)$ ]]; then
+	log "Could not calculate revision! The PROPOSED must be either major minor build or patch. PROPOSED='$PROPOSED'";
+	exit 32
+fi
+
+getRevisionTypeByPR() {
+	log "Getting revision type ...";
+	log "(major, minor, build, patch)";
+	log "PROPOSED=$PROPOSED";
+	
+    local type=$PROPOSED;
+
+    if [ "$GITHUB_EVENT_NAME" = "pull_request" ] ; then 
+    	local HEAD=${GITHUB_HEAD_REF,,} # to lower case.. breaks older bashes. 
+
+        if  [[ "$HEAD" =~ ^release.*$ ]] && [[ "$PROPOSED" =~ ^(major|minor|build|patch)$ ]] ; then 
+                type="major";
+        elif [[ "$HEAD" =~ ^feat.*$ ]]   && [[ "$PROPOSED" =~ ^(minor|build|patch)$ ]] ; then 
+                type="minor";
+        elif [[ "$HEAD" =~ ^build.*$ ]]  && [[ "$PROPOSED" =~ ^(build|patch)$ ]] ; then 
+                type="build";
+        elif [[ "$HEAD" =~ ^((hot[ -]?)?fix|bug|patch).*$ ]] && [[ "$PROPOSED" =~ ^(patch)$ ]] ; then 
+                type="patch";
+        fi
+    else 
+        log "not a GITHUB Pull request : nothing to do"
+    fi
+
+    log "Type: $type";
+	echo "$type"
+}
+
+echo "$(getRevisionTypeByPR)";
+exit 0

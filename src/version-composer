@@ -1,7 +1,7 @@
 #! /bin/bash
 
 #version-composer
-#by Julian Sangillo
+#by Julian Sangillo/mike wessling
 #Returns a new version identifier based on the latest existing tag in your current branch.
 
 REVISION_PATTERN="$1";
@@ -12,11 +12,13 @@ DEV_BRANCH="$5";
 STABLE_TAG="$6";
 TEST_TAG="$7";
 DEV_TAG="$8";
+PR_TYPING=${9-"FALSE"};
 
 if [ "$#" -ne 8 ]; then
 	log "Illegal number of arguments.";
 	exit 1
 fi
+
 
 cat resources/ascii-title.txt >&2;
 
@@ -30,7 +32,10 @@ NEW_RELEASE_TAG=$(choose-release-tag -s "$STABLE_BRANCH" -S "$STABLE_TAG" -t "$T
 
 if [ "$NEW_RELEASE_TAG" = "$DEV_TAG" ]; then
 	if ! [ -z "$LATEST_VERSION" ]; then
-		REVISION_TYPE=$(get-revision-type $LATEST_VERSION_TAGGED $PREFERRED_TYPE) || exit $?;
+		REVISION_TYPE=$(get-revision-type $LATEST_VERSION_TAGGED $PREFERRED_TYPE ) || exit $?;
+		if [ "$PR_TYPING" = "TRUE" ] ; then
+			REVISION_TYPE=$(get-revision-type-by-pr $REVISION_TYPE) || exit $?;
+		fi
 		RAW_VERSION=$(calculate-revision $REVISION_PATTERN $LATEST_VERSION_NOT_TAGGED $REVISION_TYPE) || exit $?;
 	else
 		RAW_VERSION=$(calculate-revision -i $REVISION_PATTERN);

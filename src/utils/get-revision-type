@@ -22,7 +22,7 @@ if ! [[ "$LATEST_VERSION" =~ ^[0-9]+(\.[0-9]+)*(\.[A-Za-z]+)?$ ]]; then
 	exit 16
 fi
 
-if [ "$DEFAULT" != "build" ] && [ "$DEFAULT" != "patch" ]; then
+if [ "$DEFAULT" != "build" ] && [ "$DEFAULT" != "patch" ] && [ "$DEFAULT" != "pullrequest" ]; then
 	log "Could not calculate revision! The default must be either build or patch. Default='$DEFAULT'";
 	exit 32
 fi
@@ -34,6 +34,10 @@ getChangeType() {
 	local regex='^([a-zA-Z ]+)(\(.*\))?:.*$';
 
 	log "$commit = $message";
+
+	msg=$(echo $message | grep -P "$regex" | sed -r "s/$regex/\1/g");
+	log "type: $msg";
+
 	echo $message | grep -P "$regex" | sed -r "s/$regex/\1/g"
 }
 
@@ -51,7 +55,7 @@ getRevisionType() {
 		return;
 	fi
 	
-	declare -A TYPES=( [major]='BREAKING CHANGE' [minor]='feat perf' [build]='build' [patch]='patch' );
+	declare -A TYPES=( [major]='BREAKING CHANGE' [minor]='feat perf' [build]='build' [patch]='patch fix' );
 	log "major=${TYPES[major]}";
 	log "minor=${TYPES[minor]}";
 	log "build=${TYPES[build]}";
@@ -74,12 +78,13 @@ getRevisionType() {
 				type='build';
 				TYPES[build]='';
 				TYPES[patch]='';
-			elif [ " ${TYPES[patch]} " =~ " $change " ]; then
+			elif [[ " ${TYPES[patch]} " =~ " $change " ]]; then
 				type='patch';
 				TYPES[build]='';
 				TYPES[patch]='';
 			fi
 		fi
+		log "$change = $type"
 	done <<< "$history"
 	
 	log "Type: $type";

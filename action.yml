@@ -36,6 +36,10 @@ inputs:
     description: Custom release tag name for development releases.
     required: false
     default: UNSTABLE
+  pr-typing: Use pull request branch naming as additional source for revision type
+      description: can be TRUE or FALSE, FALSE is default
+      required: false
+      default: FALSE
 outputs:
   version:
     description: The new version with the release tag appended at the end.
@@ -58,5 +62,5 @@ runs:
       shell: bash
 
     - id: versioning
-      run: version-composer "${{ inputs.revision-pattern }}" "${{ inputs.preferred-type }}" "${{ inputs.stable-branch }}" "${{ inputs.test-branch }}" "${{ inputs.dev-branch }}" "${{ inputs.stable-tag }}" "${{ inputs.test-tag }}" "${{ inputs.dev-tag }}"
+      run: version-composer "${{ inputs.revision-pattern }}" "${{ inputs.preferred-type }}" "${{ inputs.stable-branch }}" "${{ inputs.test-branch }}" "${{ inputs.dev-branch }}" "${{ inputs.stable-tag }}" "${{ inputs.test-tag }}" "${{ inputs.dev-tag }}" "${{ inputs.pr-typing }}"
       shell: bash
