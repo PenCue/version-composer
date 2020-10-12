@@ -36,10 +36,10 @@ inputs:
     description: Custom release tag name for development releases.
     required: false
     default: UNSTABLE
-  pr-typing: Use pull request branch naming as additional source for revision type
-      description: can be TRUE or FALSE, FALSE is default
-      required: false
-      default: FALSE
+  pr-typing: 
+    description: Use pull request branch naming as additional source for revision type, can be TRUE or FALSE, FALSE is default
+    required: false
+    default: FALSE
 outputs:
   version:
     description: The new version with the release tag appended at the end.
