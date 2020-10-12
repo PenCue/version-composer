@@ -22,7 +22,7 @@ if [ "$#" -ne 9 ]; then
 fi
 
 
-cat resources/ascii-title.txt >&2;
+cat "$GITHUB_ACTION_PATH/resources/ascii-title.txt" >&2;
 
 log "Starting ...";
 
