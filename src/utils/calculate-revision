@@ -156,7 +156,9 @@ increment() {
 			[ ! -z "$BUILD" ] && ((BUILD++));
 			[ ! -z "$PATCH" ] && PATCH=0
 			;;
-		patch) [ ! -z "$PATCH" ] && ((PATCH+=$(numberOfNewCommits))) ;;
+		patch) 
+			[ ! -z "$PATCH" ] && ((PATCH++));
+			;;
 		*)
 			log "Could not calculate revision! Unknown revision type '$REVISION_TYPE'.";
 			exit  80
