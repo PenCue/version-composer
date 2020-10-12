@@ -36,7 +36,7 @@ NEW_RELEASE_TAG=$(choose-release-tag -s "$STABLE_BRANCH" -S "$STABLE_TAG" -t "$T
 if [ "$NEW_RELEASE_TAG" = "$DEV_TAG" ]; then
 	if ! [ -z "$LATEST_VERSION_TAGGED" ]; then
 		REVISION_TYPE=$(get-revision-type $LATEST_VERSION_TAGGED $PREFERRED_TYPE ) || exit $?;
-		if [ "$PR_TYPING" = "TRUE" ] ; then
+		if [ "${PR_TYPING,,}" = "true" ] ; then
 			REVISION_TYPE=$(get-revision-type-by-pr $REVISION_TYPE) || exit $?;
 		fi
 		RAW_VERSION=$(calculate-revision $REVISION_PATTERN $LATEST_VERSION_NOT_TAGGED $REVISION_TYPE) || exit $?;
