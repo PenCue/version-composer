@@ -14,7 +14,7 @@ TEST_TAG="$7";
 DEV_TAG="$8";
 PR_TYPING=${9-"FALSE"};
 
-if [ "$#" -ne 8 ]; then
+if [ "$#" -ne 9 ]; then
 	log "Illegal number of arguments.";
 	exit 1
 fi
