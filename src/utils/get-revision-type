@@ -84,7 +84,7 @@ getRevisionType() {
 				TYPES[patch]='';
 			fi
 		fi
-		log "$change = $type"
+		log "change : $change = $type"
 	done <<< "$history"
 	
 	log "Type: $type";

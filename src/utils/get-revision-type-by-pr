@@ -24,7 +24,7 @@ if [[ ! "$PROPOSED" =~ ^(major|minor|build|patch)$ ]]; then
 fi
 
 getRevisionTypeByPR() {
-	log "Getting revision type ...";
+	log "Getting revision type by PR ...";
 	log "(major, minor, build, patch)";
 	log "PROPOSED=$PROPOSED";
 	

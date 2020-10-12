@@ -21,6 +21,7 @@ if [ "$#" -ne 9 ]; then
 	exit 1
 fi
 
+log "$PR_TYPING"
 
 cat "$GITHUB_ACTION_PATH/resources/ascii-title.txt" >&2;
 
