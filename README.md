@@ -1,4 +1,4 @@
-# Version Composer v1
+# Version Composer v1.2.0.0 
 Creates a new version identifier to use with your builds and releases.
 ## Features
 * Return as output a version with and without a release tag appended at the end
