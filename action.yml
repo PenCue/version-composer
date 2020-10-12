@@ -54,8 +54,8 @@ runs:
   using: composite
   steps:
     - run: |
-        echo "::add-path::$GITHUB_ACTION_PATH/${{ env.SRC }}";
-        echo "::add-path::$GITHUB_ACTION_PATH/${{ env.SRC_UTILS }}"
+        echo "$GITHUB_ACTION_PATH/${{ env.SRC }}" >>$GITHUB_PATH;
+        echo "$GITHUB_ACTION_PATH/${{ env.SRC_UTILS }}" >>$GITHUB_PATH;
       env:
         SRC: src
         SRC_UTILS: src/utils
