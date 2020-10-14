@@ -36,7 +36,7 @@ inputs:
     description: Set to YES to set version to 0.0.0 if no version could be determined. Default NO 
     required: false
     default: NO
-  outputs:
+outputs:
   full-version:
     description: The new version with the release tag appended at the end. Prefixed by version prefix
     value: ${{ steps.versioning.outputs.full-version }}
