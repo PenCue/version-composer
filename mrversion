@@ -287,7 +287,7 @@ initializeGit		#
 getCurrentBranch	# side effect CURRENT_BRANCH, CURRENT_TAG are set
 getLatestVersion	# side effect LATEST_VERSION, VER_MAJOR,VER_MINOR,VER_PATCH,VER_TAG are set
 # if NOT INITIALIZING THEN 
-if [ -z "$INITIALIZE" ] && [ "${INITIALIZE}" = "YES" ] ; then 
+if [ -z "$INITIALIZE" ] ; then 
 	checkSourceTag		# side effect BUMP_VERSION
 	if [ $BUMP_VERSION = "YES" ] ; then 
 		getRevisionType $LATEST_VERSION
