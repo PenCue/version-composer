@@ -5,7 +5,8 @@ set -euo pipefail
 #by mike wessling (based on version-composer)
 #Returns a new version identifier based on the latest existing tag in your current branch.
 PROGNAME="mrversion"
-
+TERM=${TERM-xterm}
+export TERM
 # log_info the given message at the given level. All logs are written to stderr with a timestamp.
 function log_base {
     local -r level="$1"
