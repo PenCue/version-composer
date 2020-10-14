@@ -1,0 +1,326 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+#mrversion
+#by mike wessling (based on version-composer)
+#Returns a new version identifier based on the latest existing tag in your current branch.
+PROGNAME="mrversion"
+
+# log_info the given message at the given level. All logs are written to stderr with a timestamp.
+function log_base {
+    local -r level="$1"
+    local -r message="$2"
+    local -r timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo -e "${timestamp} ${PROGNAME} [${level}] $(tput bold)$(tput setaf 255)${message}$(tput sgr 0)" 
+}
+
+# log_info the given message at INFO level. All logs are written to stderr with a timestamp.
+function log_info {
+  local -r message="$*"
+  log_base "$(tput bold)$(tput setaf 190)INFO$(tput sgr 0)" "$message"
+}
+
+# log_info the given message at WARN level. All logs are written to stderr with a timestamp.
+function log_warn {
+  local -r message="$*"
+  log_base "$(tput bold)$(tput setaf 220)WARN$(tput sgr 0)" "$message"
+}
+
+# log_info the given message at ERROR level. All logs are written to stderr with a timestamp.
+function log_error {
+  local -r message="$*"
+  log_base $(tput bold)$(tput setaf 196)ERROR$(tput sgr 0) "$message"
+}
+
+function log_debug {
+	if [ ! -z "$DEBUG" ] ; then 
+	  	local -r message="$*"
+  		log_base $(tput bold)$(tput setaf 196)DEBUG$(tput sgr 0) "$message"
+	fi
+}
+
+if [ "$#" -ne 8 ]; then
+	log_error "Illegal number of arguments. $# ";
+	exit 1
+fi
+
+STABLE_BRANCH="$1";
+INT_BRANCH="$2";
+DEV_BRANCH="$3";
+
+STABLE_TAG="$4";
+INT_TAG="$5";
+DEV_TAG="$6";
+
+VERSION_PREFIX="$7";
+INITIALIZE=${8-"YES"}
+
+DEBUG=${DEBUG-""}
+GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME-""}
+GITHUB_HEAD_REF=${GITHUB_HEAD_REF-""}
+LATEST_VERSION=""
+CURRENT_BRANCH=""
+BUMP_VERSION=NO
+BUMP_TYPE=patch 
+NEW_MAJOR=0
+NEW_MINOR=0
+NEW_PATCH=0
+
+log_info "${PROGNAME} Starting ...";
+
+declare -A BRANCH2TAG=( [$STABLE_BRANCH]="${STABLE_TAG}" [$INT_BRANCH]="${INT_TAG}" [$DEV_BRANCH]="${DEV_TAG}" ) 
+# tags can be empty.. 
+declare -A TAG2BRANCH=( ["X${STABLE_TAG}X"]="${STABLE_BRANCH}" ["X${INT_TAG}X"]="${INT_BRANCH}" ["X${DEV_TAG}X"]="${DEV_BRANCH}" ) 
+
+declare -A FOLLOWS=( [$DEV_BRANCH]=$INT_BRANCH [$INT_BRANCH]=$STABLE_BRANCH )
+declare -A PRECEDS=( [$STABLE_BRANCH]=$INT_BRANCH [$INT_BRANCH]=$DEV_BRANCH )
+
+# define patterns for matching BUMP TYPE events
+declare -A TYPES
+TYPES[major]='(breaking change|major)' 
+TYPES[minor]='^(feat(ure)?|perf(ormance)?|change|minor)' 
+TYPES[patch]='^(patch|(hot[ -]?)?fix)'
+PRIORITY="major minor patch"
+# numeric value for priority 1 is highest prio
+declare -A PRIOLIST
+i=1 ; for prio in $PRIORITY ; do PRIOLIST[$prio]=$i ; let i++ ; done
+
+initializeGit() {
+	log_info "Initializing git ...";
+	
+	local version="$(git --version)";
+	if [  "$?" -ne "0" ]; then
+		log_info "Git not installed. Installing ...";
+		apt install git;
+		local version="$(git --version)";
+	else
+		log_info "Git already installed.";
+	fi
+	
+	log_info "git $version"
+	
+	git fetch --tags;
+	log_info "Git initialized successfully!";
+}
+
+getCurrentBranch() {
+	CURRENT_BRANCH=$(git branch --show-current)
+	log_info "Current branch: >${CURRENT_BRANCH}<"
+
+	if [ ${BRANCH2TAG[$CURRENT_BRANCH]+_} ]; then 
+		CURRENT_TAG=${BRANCH2TAG[$CURRENT_BRANCH]}
+		log_info "Current tag: >${CURRENT_TAG}<"
+	else
+		log_error "Branch $CURRENT_BRANCH is not configured"
+		exit 63
+	fi
+
+}
+
+getLatestVersion() {
+	log_info "Getting the latest version from repo ...";
+	
+	local latestreachable=$(git describe --abbrev=0 --tags 2>/dev/null )
+	local versions=$(git tag -l --contains ${latestreachable} )
+	log_debug "versions $versions"
+	local latest=""
+	while read -r ver ; do
+		log_debug "read ${ver}"
+		if [[ "$ver" =~ ^${VERSION_PREFIX}([0-9]+)\.([0-9]+)\.([0-9]+)(\.[0-9]+)?(\.([A-Za-z]+))?$ ]]; then
+			if [ -z "${latest}" ] ; then
+				VER_MAJOR=${BASH_REMATCH[1]}
+				VER_MINOR=${BASH_REMATCH[2]}
+				VER_PATCH=${BASH_REMATCH[3]}
+				VER_TAG=${BASH_REMATCH[6]}
+				LATEST_VERSION=$ver
+				latest="${ver}"
+				log_info "version found: ${latest}: Major $VER_MAJOR Minor $VER_MINOR Patch $VER_PATCH Tag $VER_TAG"
+			else
+				log_error "Conflicting version tags ${latest} and ${ver}";
+				exit 64
+			fi
+		fi
+	done <<< "$versions"
+	
+	if [ -z $latest ]; then
+		log_warn "No tagged version to start from";
+		if [ ! -z "${INITIALIZE}" ] && [ "${INITIALIZE}" = "YES" ] ; then 
+			log_warn "Initialize: version ${VERSION_PREFIX}0.0.0"
+			NEW_MAJOR=0
+			NEW_MINOR=0
+			NEW_PATCH=0
+		else 
+			log_error "Not initializing version number"
+			exit 65 
+		fi
+	else
+		log_info "Latest version found. Revision: $latest";
+		INITIALIZE=""
+	fi
+}
+
+checkSourceTag() {
+	if [ $CURRENT_BRANCH = $DEV_BRANCH ] ; then 
+		local source_branch=${TAG2BRANCH["X${VER_TAG}X"]}
+		if [[ $source_branch = $CURRENT_BRANCH ]] ; then
+			log_info "Found expected tag >$VER_TAG< for >$CURRENT_BRANCH<"
+			log_info "Latest version for >$CURRENT_BRANCH< is merge from >$source_branch<" 
+			BUMP_VERSION=YES
+		else
+			log_error "$LATEST_VERSION is not from dev branch $source_branch"
+			exit 66
+		fi
+	else
+		local source_branch=${PRECEDS[$CURRENT_BRANCH]}
+		local source_tag=${BRANCH2TAG[$source_branch]}
+		log_debug "expecting source_tag $source_tag for $CURRENT_BRANCH with tag $VER_TAG"
+
+		if [[ -z "$source_tag" && -z "$VER_TAG" ]] || [[  $source_tag = $VER_TAG ]] ; then
+			log_info "Found expected tag >$source_tag< for merge into >$CURRENT_BRANCH<"
+			log_info "Latest version for >$CURRENT_BRANCH< is merge from >$source_branch<" 
+			BUMP_VERSION=NO
+		else
+			log_error "$LATEST_VERSION is not from a preceding branch $source_branch"
+			exit 66
+		fi
+	fi
+}
+
+getRevisionType() {
+	local start_history=$1
+	local history="$(git rev-list --ancestry-path HEAD ^$start_history)";
+	local usingdefault="YES" # need to know if there was any information in the logs or PR to indicate we know what is happening
+	
+	if [ -z "$history" ]; then
+		log_info "No commit history since $start_history";
+	else
+		while read -r commit; do
+			local mergecomment=$(git show -s --format=%s $commit);
+			local newtype=""
+			log_debug "commit $commit : $mergecomment"
+
+			if [[ ! -z "$mergecomment" ]] ; then
+				for prio in $PRIORITY ; do 
+					if [[  "$mergecomment" =~ ${TYPES[$prio]}  ]]; then
+						newtype=$prio;
+						log_debug "matched >$prio<"
+						break
+					fi
+				done
+
+				if [[ ! -z "$newtype" ]] ; then 
+					usingdefault="NO"
+					if [[ ${PRIOLIST[$BUMP_TYPE]} -gt ${PRIOLIST[$newtype]} ]] ; then
+						log_info "bump type gets bumped from >$BUMP_TYPE> to >$newtype<"
+						BUMP_TYPE=$newtype
+					fi
+				fi
+			fi
+		done <<< "$history"
+	fi
+
+	# Look at PR branch name (GITHUB specific)
+	
+    if [ "$GITHUB_EVENT_NAME" = "pull_request" ] ; then 
+    	local HEAD=${GITHUB_HEAD_REF,,} # to lower case.. breaks older bashes. 
+		local newtype=""
+        log_info "Head branch of PR is >$HEAD<"
+        if  [[ "$HEAD" =~ ^major.*$ ]] ; then 
+                newtype="major";
+        elif [[ "$HEAD" =~ ^(feat|perf|rework).*$ ]] ;then 
+                newtype="minor";
+        elif [[ "$HEAD" =~ ^((hot[ -]?)?fix|bug|patch).*$ ]] ; then 
+                newtype="patch";
+        else 
+			log_error "PR branch name doesn't match ^major ^(feat|perf|rework) or ^(fix|hotfix|patch) "
+			log_error "Add commit with major minor or patch as first word in the comment"
+		fi
+
+		if [[ ! -z "$newtype" ]] ; then 
+			usingdefault="NO"
+			if [[ ${PRIOLIST[$BUMP_TYPE]} -gt ${PRIOLIST[$newtype]} ]] ; then
+				log_info "bump type gets bumped by PR from >$BUMP_TYPE< to >$newtype<"
+				BUMP_TYPE=$newtype
+			fi
+		fi
+	else 
+		log_debug "Not a github pull request - skipping PR "
+    fi
+
+	if [[ $usingdefault = "NO" ]] ; then 
+		log_info "Overall Bump Type: >$BUMP_TYPE<";
+	else 
+		log_error "No indication in commit history or pr name to determine bump type, please fix"
+		log_error "Add commit with major minor or patch as first word in the comment"
+		exit 67
+	fi 
+}
+
+bumpVersion() {
+	local REVISION_TYPE=$1
+
+	log_debug "REVISION_TYPE $REVISION_TYPE"
+	
+	if [[ $REVISION_TYPE = "major" ]] ; then 
+		NEW_MAJOR=$((VER_MAJOR+1))
+		NEW_MINOR=0
+		NEW_PATCH=0
+	elif [[ $REVISION_TYPE = "minor" ]] ; then
+		NEW_MAJOR=$VER_MAJOR
+		NEW_MINOR=$((VER_MINOR+1))
+		NEW_PATCH=0
+	elif [[ $REVISION_TYPE = "patch" ]] ; then 
+		NEW_MAJOR=$VER_MAJOR
+		NEW_MINOR=$VER_MINOR
+		NEW_PATCH=$((VER_PATCH+1))
+	else 
+		log_error "Could not calculate revision! Unknown revision type '$REVISION_TYPE'.";
+		exit  80
+	fi
+
+	log_info "version bump: $REVISION_TYPE : Major $NEW_MAJOR Minor $NEW_MINOR Patch $NEW_PATCH"
+}
+
+# prog starting 
+initializeGit		# 
+getCurrentBranch	# side effect CURRENT_BRANCH, CURRENT_TAG are set
+getLatestVersion	# side effect LATEST_VERSION, VER_MAJOR,VER_MINOR,VER_PATCH,VER_TAG are set
+# if NOT INITIALIZING THEN 
+if [ -z "$INITIALIZE" ] && [ "${INITIALIZE}" = "YES" ] ; then 
+	checkSourceTag		# side effect BUMP_VERSION
+	if [ $BUMP_VERSION = "YES" ] ; then 
+		getRevisionType $LATEST_VERSION
+		bumpVersion $BUMP_TYPE
+	else
+		NEW_MAJOR=$VER_MAJOR
+		NEW_MINOR=$VER_MINOR
+		NEW_PATCH=$VER_PATCH
+	fi
+fi
+NEW_TAG=$CURRENT_TAG
+if [[ ! -z "$NEW_TAG" ]] ; then 
+	DOT_NEW_TAG=".${NEW_TAG}"
+else 
+	DOT_NEW_TAG=""
+fi
+# Here we have the new version in NEW_*
+
+log_info "release version : ${VERSION_PREFIX}${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}${DOT_NEW_TAG} Major $NEW_MAJOR Minor $NEW_MINOR Patch $NEW_PATCH Tag $NEW_TAG"
+if [ $CURRENT_BRANCH = $STABLE_BRANCH ]; then
+	IS_PRERELEASE='false';
+else
+	IS_PRERELEASE='true';
+fi
+
+echo "::set-output name=full-version::${VERSION_PREFIX}${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}${DOT_NEW_TAG}";
+echo "::set-output name=version::${VERSION_PREFIX}${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}";
+echo "::set-output name=major-version::${VERSION_PREFIX}${NEW_MAJOR}${DOT_NEW_TAG}";
+echo "::set-output name=major-minor-version::${VERSION_PREFIX}${NEW_MAJOR}.${NEW_MINOR}${DOT_NEW_TAG}";
+echo "::set-output name=tag::${NEW_TAG}";
+echo "::set-output name=dot-tag::${DOT_NEW_TAG}";
+echo "::set-output name=version-prefix::${VERSION_PREFIX}";
+echo "::set-output name=is_prerelease::$IS_PRERELEASE";
+
+# log_info "Success";
+
+# exit 0

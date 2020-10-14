@@ -1,66 +1,73 @@
-name: Version Composer
-author: Julian Sangillo/mike Wessling
-description: Returns a new version identifier
+name: Mr  Version
+author: mike Wessling
+description: Returns bumped version numbers
 branding:
   icon: tag
   color: red
 inputs:
-  revision-pattern:
-    description: Custom pattern showing version structure.
-    required: false
-    default: M.m.b
-  preferred-type:
-    description: The preferred revision type to fallback to if no other type can be determined. Possible values are 'build' or 'patch'
-    required: false
-    default: build
   stable-branch:
     description: Name of branch in your repo that will be used for stable releases.
     required: false
     default: master
-  test-branch:
-    description: Name of branch in your repo that will be used for test releases.
+  int-branch:
+    description: Name of branch in your repo that will be used for int releases.
     required: false
-    default: test
+    default: int
   dev-branch:
     description: Name of branch in your repo that will be used for development releases.
     required: false
-    default: develop
+    default: dev
   stable-tag:
     description: Custom release tag name for stable releases. By default, stable releases have no stable tag.
     required: false
-  test-tag:
-    description: Custom release tag name for test releases.
+  int-tag:
+    description: Custom release tag name for int releases.
     required: false
-    default: TEST
+    default: int
   dev-tag:
     description: Custom release tag name for development releases.
     required: false
-    default: UNSTABLE
-  pr-typing: 
-    description: Use pull request branch naming as additional source for revision type, can be TRUE or FALSE, FALSE is default
+    default: unstable
+  version-prefix: 
+    description: the version prefix to use retrieve the tags, defaults to v
     required: false
     default: FALSE
-outputs:
+  initialize: 
+    description: Set to YES to set version to 0.0.0 if no version could be determined. Default NO 
+    required: false
+    default: NO
+  outputs:
+  full-version:
+    description: The new version with the release tag appended at the end. Prefixed by version prefix
+    value: ${{ steps.versioning.outputs.full-version }}
+  major-version:
+    description: The new major version with the release tag appended at the end. Prefixed by version prefix
+    value: ${{ steps.versioning.outputs.major-version }}
+  major-minor-version:
+    description: The new major.minor version with the release tag appended at the end. Prefixed by version prefix
+    value: ${{ steps.versioning.outputs.major-minor-version }}
   version:
-    description: The new version with the release tag appended at the end.
+    description: The new version without the release tag appended at the end. Prefixed by version prefix
     value: ${{ steps.versioning.outputs.version }}
-  raw-version:
-    description: Version without the release tag at the end.
-    value: ${{ steps.versioning.outputs.raw_version }}
+  tag:
+    description: the release tag
+    value: ${{ steps.versioning.outputs.tag}}
+  dot-tag:
+    description: the dotted release tag 
+    value: ${{ steps.versioning.outputs.dot-tag}}
+  version-prefix:
+    description: version prefix as configured 
+    value: ${{ steps.versioning.outputs.version-prefix}}
   is-prerelease:
-    description: True if this version is an unstable release (dev or test branch) or false otherwise.
+    description: True if this version is an unstable release (dev or int branch) or false otherwise.
     value: ${{ steps.versioning.outputs.is_prerelease }}
 runs:
   using: composite
   steps:
     - run: |
-        echo "$GITHUB_ACTION_PATH/${{ env.SRC }}" >>$GITHUB_PATH;
-        echo "$GITHUB_ACTION_PATH/${{ env.SRC_UTILS }}" >>$GITHUB_PATH;
-      env:
-        SRC: src
-        SRC_UTILS: src/utils
+        echo "$GITHUB_ACTION_PATH" >>$GITHUB_PATH
       shell: bash
 
     - id: versioning
-      run: version-composer "${{ inputs.revision-pattern }}" "${{ inputs.preferred-type }}" "${{ inputs.stable-branch }}" "${{ inputs.test-branch }}" "${{ inputs.dev-branch }}" "${{ inputs.stable-tag }}" "${{ inputs.test-tag }}" "${{ inputs.dev-tag }}" "${{ inputs.pr-typing }}"
+      run: mrversion "${{ inputs.stable-branch }}" "${{ inputs.int-branch }}" "${{ inputs.dev-branch }}" "${{ inputs.stable-tag }}" "${{ inputs.int-tag }}" "${{ inputs.dev-tag }}" "${{ inputs.version-prefix }}" "${{ inputs.initialize }}"
       shell: bash
