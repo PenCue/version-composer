@@ -32,7 +32,7 @@ getRevisionTypeByPR() {
 
     if [ "$GITHUB_EVENT_NAME" = "pull_request" ] ; then 
     	local HEAD=${GITHUB_HEAD_REF,,} # to lower case.. breaks older bashes. 
-
+        log "Head $HEAD"
         if  [[ "$HEAD" =~ ^release.*$ ]] && [[ "$PROPOSED" =~ ^(major|minor|build|patch)$ ]] ; then 
                 type="major";
         elif [[ "$HEAD" =~ ^feat.*$ ]]   && [[ "$PROPOSED" =~ ^(minor|build|patch)$ ]] ; then 
