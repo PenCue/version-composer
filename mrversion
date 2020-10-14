@@ -125,7 +125,7 @@ getCurrentBranch() {
 	fi 
 	SOURCE_TAG=${BRANCH2TAG[$SOURCE_BRANCH]}
 
-	log_debug "expecting source_tag $source_tag for $CURRENT_BRANCH with tag $VER_TAG"
+	log_debug "expecting source_tag $SOURCE_TAG for $CURRENT_BRANCH"
 
 }
 
@@ -140,7 +140,7 @@ getLatestVersion() {
 		log_debug "read ${ver}"
 		if [[ "$ver" =~ ^${VERSION_PREFIX}([0-9]+)\.([0-9]+)\.([0-9]+)(\.[0-9]+)?(\.([A-Za-z]+))?$ ]]; then
 			# only consider tags from the right branch
-			if [ "X${BASH_REMATCH[6]}X" = "X${SOURCE_TAG}X" ]
+			if [ "X${BASH_REMATCH[6]}X" = "X${SOURCE_TAG}X" ] ; then
 				if [ -z "${latest}" ] ; then
 					VER_MAJOR=${BASH_REMATCH[1]}
 					VER_MINOR=${BASH_REMATCH[2]}
