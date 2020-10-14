@@ -61,6 +61,8 @@ GITHUB_EVENT_NAME=${GITHUB_EVENT_NAME-""}
 GITHUB_HEAD_REF=${GITHUB_HEAD_REF-""}
 LATEST_VERSION=""
 CURRENT_BRANCH=""
+SOURCE_BRANCH=""
+SOURCE_TAG=""
 BUMP_VERSION=NO
 BUMP_TYPE=patch 
 NEW_MAJOR=0
@@ -116,6 +118,15 @@ getCurrentBranch() {
 		exit 63
 	fi
 
+	if [ $CURRENT_BRANCH = $DEV_BRANCH ] ; then 
+		SOURCE_BRANCH=$CURRENT_BRANCH
+	else
+		SOURCE_BRANCH=${PRECEDS[$CURRENT_BRANCH]}
+	fi 
+	SOURCE_TAG=${BRANCH2TAG[$SOURCE_BRANCH]}
+
+	log_debug "expecting source_tag $source_tag for $CURRENT_BRANCH with tag $VER_TAG"
+
 }
 
 getLatestVersion() {
@@ -128,17 +139,24 @@ getLatestVersion() {
 	while read -r ver ; do
 		log_debug "read ${ver}"
 		if [[ "$ver" =~ ^${VERSION_PREFIX}([0-9]+)\.([0-9]+)\.([0-9]+)(\.[0-9]+)?(\.([A-Za-z]+))?$ ]]; then
-			if [ -z "${latest}" ] ; then
-				VER_MAJOR=${BASH_REMATCH[1]}
-				VER_MINOR=${BASH_REMATCH[2]}
-				VER_PATCH=${BASH_REMATCH[3]}
-				VER_TAG=${BASH_REMATCH[6]}
-				LATEST_VERSION=$ver
-				latest="${ver}"
-				log_info "version found: ${latest}: Major $VER_MAJOR Minor $VER_MINOR Patch $VER_PATCH Tag $VER_TAG"
+			# only consider tags from the right branch
+			if [ "X${BASH_REMATCH[6]}X" = "X${SOURCE_TAG}X" ]
+				if [ -z "${latest}" ] ; then
+					VER_MAJOR=${BASH_REMATCH[1]}
+					VER_MINOR=${BASH_REMATCH[2]}
+					VER_PATCH=${BASH_REMATCH[3]}
+					VER_TAG=${BASH_REMATCH[6]}
+					LATEST_VERSION=$ver
+					latest="${ver}"
+					log_info "version found: ${latest}: Major $VER_MAJOR Minor $VER_MINOR Patch $VER_PATCH Tag $VER_TAG"
+				else
+					log_error "Conflicting version tags ${latest} and ${ver}";
+					exit 64
+				fi
 			else
-				log_error "Conflicting version tags ${latest} and ${ver}";
-				exit 64
+				log_warn "Found matching version from other branch - can be ignored"
+				log_warn "but disabling INITIALIZE so it won't reset the versioning"
+				INITIALIZE="NO"
 			fi
 		fi
 	done <<< "$versions"
